@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-var fs = require('fs');
+//var fs = require('fs');
+var fs = require('fs-extra');
 var path = require('path');
 var existsSync = fs.existsSync || path.existsSync;
 
@@ -16,10 +17,28 @@ var _ = require('lodash');
 var program = require('commander');
 var version = require('./package').version;
 
-// configs
-var configs = require(process.cwd()+'/config');
+var log = console.log;
 
-//console.log(configs);
+
+// configs
+try{
+  var configs = require(process.cwd()+'/config');
+} catch(err) {
+  log('no config.js found in ./');
+  
+  try{
+    //log(path.resolve(__dirname,'./tpl/config.js'));
+    
+    fs.copySync(path.resolve(__dirname,'./tpl/config.js'), 'config.js');
+
+  }catch(err){
+    log('fail to create config.js');
+  }
+  
+  log(' config.js created');
+  process.exit(1);
+}
+
 
 // global vars
 var src = configs.src,
@@ -95,20 +114,20 @@ if (!args || args.length === 0) {
 }
 
 
+
 // prepare files to package to offline zip for alloykit
 gulp.task('offline:prepare', function(cb) {
 
   var q = _.map(configs.zipConf, function(item) {
 
-    
-
       return function(callback) {
         var urlObj = url.parse(item.target);
         var target = path.join(configs.offlineCache, urlObj.hostname, urlObj.pathname);
-        console.log(target)
+        
         gulp.src(item.include, distOpt)
             .pipe(gulp.dest(target))
             .on('end', function() {
+
                 callback();
             });
       };
@@ -123,12 +142,17 @@ gulp.task('offline:prepare', function(cb) {
 // package .offline -> offline.zip for alloykit
 gulp.task('offline:zip', function() {
 
+  log(configs.offline+configs.zipName+' created');
+
   return gulp.src('**/*.*', {
       cwd: configs.offlineCache
   })
     .pipe(zip(configs.zipName))
     .pipe(gulp.dest(configs.offline));
+
+
 });
+
 
 gulp.task('offline', function(cb) {
 
@@ -151,7 +175,6 @@ gulp.task('clean', function() {
 
 
 if( program.zip ) {
-  
   runSequence('offline:prepare', 'offline:zip', 'clean');
   //gulp.start('offline');
 }
