@@ -8,39 +8,104 @@ var existsSync = fs.existsSync || path.existsSync;
 var url = require('url');
 var async = require('async');
 var runSequence = require('run-sequence');
-var gulp = require('gulp');
-
-var zip = require('gulp-zip');
-var clean = require('gulp-rimraf');
 var _ = require('lodash');
-
 var program = require('commander');
+
+var gulp = require('gulp'),
+    zip = require('gulp-zip'),
+    clean = require('gulp-rimraf'),
+    newer = require('gulp-newer'),
+    savefile = require('gulp-savefile'),
+    prefix = require('gulp-autoprefixer');
+
 var version = require('./package').version;
 
 var log = console.log;
 
 
-// configs
-try{
-  var configs = require(process.cwd()+'/config');
-} catch(err) {
-  log('no config.js found in ./');
-  
-  try{
-    //log(path.resolve(__dirname,'./tpl/config.js'));
-    
-    fs.copySync(path.resolve(__dirname,'./tpl/config.js'), 'config.js');
+program
+  .version(version)
+  .option('-v, --v', 'get version')
+  .option('--usecompass', 'use compass')
+  // .option('-o, --outdir <dir>', 'path to output generated jade file(s) to', parsePath)
+  // .option('-n, --nspaces <n>', 'the number of spaces to indent generated files with', parseInt)
 
-  }catch(err){
-    log('fail to create config.js');
-  }
-  
-  log(' config.js created');
+program.parse(process.argv);
+
+var args = program.args;
+if (!args || args.length === 0) {
+  args = ['-'];
+  console.error("input argument(s) missing");
   process.exit(1);
+}
+
+var hasArg = function(arg){
+  return args.indexOf(arg) >= 0;
+};
+
+
+if( hasArg('init') ) {
+
+  if( !existsSync(process.cwd()+'/project.js') ){
+    
+    try{
+      
+      fs.copySync(path.resolve(__dirname,'./tpl/project.js'), 'project.js');
+
+    } catch(err) {
+
+      log('fail to create project.js');
+      process.exit(1);
+    }
+
+    log('project.js created, remember to edit it');
+  } else {
+
+    log('there is already a project.js ');
+  }
+
+  if( program.usecompass ){
+    
+    if( !existsSync(process.cwd()+'/config.rb') ){
+    
+      try{
+        
+        fs.copySync(path.resolve(__dirname,'./tpl/config.rb'), 'config.rb');
+
+      } catch(err) {
+
+        log('fail to create config.rb');
+        process.exit(1);
+      }
+
+      log('config.rb created');
+
+    } else {
+
+      log('there is already a config.rb');
+    }
+      
+  } 
+} else {
+
+  // is project.js exit?
+  try{
+    var configs = require(process.cwd()+'/project');
+  } catch(err) {
+    log('no project.js found in ./; Try: vascli init  or vascli init -usecompass');
+    process.exit(1);
+  }
+
+}
+
+if( program.v ) {
+  log('version: ' + version);
 }
 
 
 // global vars
+var configs = require(process.cwd()+'/project');
+
 var src = configs.src,
     dist = configs.dist,
     tmp = configs.tmp,
@@ -49,24 +114,6 @@ var src = configs.src,
     },
     distOpt = {
       cwd: dist
-    };
-
-//record changes for dist
-var changes = {
-      list: [],
-      add: function( url ){
-        var list = this.list,
-            i = list.length,
-            repeat = false;
-
-        while( i-- ){
-          if( list[i] == url ) {
-            repeat = true
-          }
-        }
-
-        if( !repeat ) list.push(url);
-      }
     };
 
 function parsePath(arg) {
@@ -85,44 +132,18 @@ function parsePath(arg) {
 }
 
 
-program
-  .version(version)
-  .option('-i, --init', 'init a project folder')
-  .option('-z, --zip', 'zip a offline.zip')
-  // .option('-t, --tabs', 'use tabs instead of spaces')
-  // .option('-o, --outdir <dir>', 'path to output generated jade file(s) to', parsePath)
-  // .option('-n, --nspaces <n>', 'the number of spaces to indent generated files with', parseInt)
-  // .option('--donotencode', 'do not html encode characters (useful for templates)')
-  // .option('--bodyless', 'do not output enveloping html and body tags')
-  // .option('--numeric', 'use numeric character entities')
-
-program.parse(process.argv);
-
-// if outdir is provided, check existance (sorry no mkdir support yet)
-// if (program.outdir && !existsSync(program.outdir)) {
-//   console.error("output directory '" + program.outdir + "' doesn't exist");
-//   process.exit(1);
-// }
-
-// process each arguments
-
-var args = program.args;
-if (!args || args.length === 0) {
-  args = ['-'];
-  // console.error("input argument(s) missing");
-  //process.exit(1);
-}
 
 
-
-// prepare files to package to offline zip for alloykit
+// prepare files to package to offline zip
 gulp.task('offline:prepare', function(cb) {
+  
+  var config = configs.offline;
 
-  var q = _.map(configs.zipConf, function(item) {
+  var q = _.map(config.zipConf, function(item) {
 
       return function(callback) {
         var urlObj = url.parse(item.target);
-        var target = path.join(configs.offlineCache, urlObj.hostname, urlObj.pathname);
+        var target = path.join(config.cache, urlObj.hostname, urlObj.pathname);
         
         gulp.src(item.include, distOpt)
             .pipe(gulp.dest(target))
@@ -139,25 +160,31 @@ gulp.task('offline:prepare', function(cb) {
 
 });
 
-// package .offline -> offline.zip for alloykit
+// package .offline -> offline.zip
 gulp.task('offline:zip', function() {
+  var config = configs.offline;
+  
+  log(config.dist + config.zipName +' created');
 
-  log(configs.offline+configs.zipName+' created');
-
-  return gulp.src('**/*.*', {
-      cwd: configs.offlineCache
-  })
-    .pipe(zip(configs.zipName))
-    .pipe(gulp.dest(configs.offline));
-
-
+  return gulp.src(config.glob, {
+      cwd: config.cache
+    })
+    .pipe(zip(config.zipName))
+    .pipe(gulp.dest(config.dist));
 });
 
+// clean .offline
+gulp.task('offline:clean', function() {
+  var opt = {
+      read: false
+  };
 
-gulp.task('offline', function(cb) {
-
-  return cb();
+  return gulp.src(configs.offline.cache, opt)
+    .pipe(clean({
+       force: true
+    }));
 });
+
 
 //===================================
 // clean
@@ -165,17 +192,62 @@ gulp.task('offline', function(cb) {
 // remove tmp files
 gulp.task('clean', function() {
   var opt = {
-      read: false
+    read: false
   };
-  return gulp.src(configs.clean, opt)
-      .pipe(clean({
-          force: true
-      }));
+  return gulp.src(configs.clean.glob, opt)
+    .pipe(clean({
+      force: true
+    }));
+});
+
+//===================================
+// copy
+//===================================
+// remove tmp files
+gulp.task('copy', function() {
+
+  return gulp.src(configs.copy.glob, opt)
+    .pipe(newer(dist))
+    .pipe(gulp.dest(dist));
 });
 
 
-if( program.zip ) {
-  runSequence('offline:prepare', 'offline:zip', 'clean');
-  //gulp.start('offline');
+// prefixer
+gulp.task('prefix', function() {
+  var config = configs.prefix;
+
+  return gulp.src(config.glob)
+    .pipe(prefix(config.platform, config.option))
+    .pipe(savefile());
+});
+
+
+if( hasArg('zip') && configs.offline ) {
+
+  runSequence('offline:prepare', 'offline:zip', 'offline:clean');
+  log('task: offline')
 }
+
+if( hasArg('clean') && configs.clean ) {
+  runSequence('clean');
+  log('task: clean')
+}
+
+
+if( hasArg('copy') && configs.copy ) {
+  
+  runSequence('copy');
+  log('task: copy')
+}
+
+if( hasArg('prefix') && configs.prefix ) {
+  runSequence('prefix');
+  log('task: prefix');
+}
+
+
+
+
+
+
 
