@@ -1,8 +1,6 @@
 # Vasteam web project build tools #
 
-## Version ##
-
-    0.1.2
+    v0.1.3
 
 ## Install ##
     npm install -g vascli
