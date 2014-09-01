@@ -33,16 +33,16 @@ program
 program.parse(process.argv);
 
 var args = program.args;
-if (!args || args.length === 0) {
-  args = ['-'];
-  console.error("input argument(s) missing");
-  process.exit(1);
-}
+
+// if (!args || args.length === 0) {
+//   args = ['-'];
+//   console.error("input argument(s) missing");
+//   process.exit(1);
+// }
 
 var hasArg = function(arg){
   return args.indexOf(arg) >= 0;
 };
-
 
 if( hasArg('init') ) {
 
@@ -92,7 +92,7 @@ if( hasArg('init') ) {
   try{
     var configs = require(process.cwd()+'/project');
   } catch(err) {
-    log('no project.js found in ./; Try: vascli init  or vascli init -usecompass');
+    log('no project.js found in ./; Try: vastl init  or vastl init --usecompass');
     process.exit(1);
   }
 
