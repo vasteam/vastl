@@ -1,32 +1,35 @@
 # Vasteam web project build tools #
 
-    v0.1.3
+    v0.0.1
 
 ## Install ##
-    npm install -g vascli
+    npm install -g vastl
 
 
 ## Command-line Usage ##
 
-初始化(在工程目录打开命令行)
-将会自动生成工程配置文件（project.js）和compass配置文件(config.rb)， 不会主动覆盖，需要手动删除.
+初始化(只生成工程配置文件)
 
-    vascli init --usecompass
+    vastl init
+
+初始化(同时生成 工程配置文件 和 compass配置文件)
+
+    vastl init --usecompass
 
 生成离线包
 
-    vascli zip
+    vastl zip
 
 拷贝文件到发布目录（dist） ( 具体配置见 project.js)
 
-    vascli copy
+    vastl copy
 
 清理临时文件( 具体配置见 project.js)
 
-    vascli clean
+    vastl clean
 
 
 prefixer重编译dist中的css文件 ( 具体配置见 project.js)
 因为prepros完整compass支持模式下无法启用 自带prefixer
 
-    vascli prefix
+    vastl prefix
